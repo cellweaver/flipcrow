@@ -12,7 +12,7 @@ dependencies = [
   "scipy",
 ]
 authors = [
-  {name = "Electron River", email = "electronriver@protonmail.com"},
+  {name = "Daniel Weaver", email = "greatergreen@protonmail.com"},
 ]
 description = "scRNAseq ML exploration"
 readme = "README.md"
