@@ -44,6 +44,23 @@ def load_scp1644_data(check_metadata: bool = True) -> ad.AnnData:
 
     scp1644_scratch = ad.concat([scp1644_small, scp1644_big])
 
+    # In the metadata 
+    # there are 24x unique biosample IDs including PANFR0489R
+    # and 23x unique cell UMI tags, which exclude PANFR0489R
+    # The reason is that PANFR0489 was repeated as PANFR0489R:
+
+    # After initial processing of fresh tissue specimens, we monitored samples closely for organoid growth. We did not passage organoids at set time intervals, as there was significant variability in the time needed to establish relatively 
+    # robust growth of organoids (Figure 3D). Instead, we maintained early passage organoids until they reached relative confluence, and then passaged them at low split ratios (1:1, 1:1.5, or 1:2 dilutions) in complete organoid medium to promote 
+    # continued growth. In one case, PANFR0489R, cells persisted as individuals and small organoids after initiation in complete organoid medium, but did not grow and expand cell numbers significantly. Approximately 15 weeks after initiation, 
+    # we switched a portion of the surviving cells to organoid medium without A83-01 or mNoggin, and observed renewed growth of organoids under these media conditions but not of those that remained in complete organoid medium. Consequently, we 
+    # expanded this sample in media without A83-01 or mNoggin, including performing early passage scRNA-seq. After several additional passages, once the organoids were robustly growing, we were able to transition this model back to complete organoid
+    # medium with no apparent change in growth rate, morphology, or transcriptional state. All other serially sampled organoids were maintained and assessed in complete medium except as indicated when specific media alterations or experimental 
+    # perturbations were performed. The identify of organoid models was authenticated by comparison of their inferred CNV profiles with targeted genomic sequencing and CNV profiles of matched patient tissue and with inferred CNV profiles from 
+    # patient tissue and earlier passage models in the case of samples serially assessed with scRNA-seq. The identify of cell line models was authenticated by short tandem repeat (STR) analysis. Cell line and organoid cultures were routinely 
+    # tested for mycoplasma contamination.
+
+    # Was the dataset using 489R combined with the other data? Yes it looks like it was analyzed.
+
     if check_metadata:
         biosample_ids = Counter([x for x in scp1644_metadata.loc[:, 'biosample_id'] if 'Biopsy' in x])
         cell_tags = Counter(['_'.join(idx.split('_')[:2]) for idx in scp1644_scratch.obs_names])
@@ -75,6 +92,7 @@ def load_scp1644_data(check_metadata: bool = True) -> ad.AnnData:
         metadata = scp1644_metadata_fix.loc[scp1644_scratch.obs_names, col]
         scp1644_scratch.obs[col] = metadata
 
+    # fix hepatocyte labeling
     scp1644_scratch.obs.loc[scp1644_scratch.obs.loc[:, 'Coarse_Cell_Annotations'] == 'Hepatocytes', 'Coarse_Cell_Annotations'] = 'Hepatocyte'
     
     print('='*40)
@@ -110,10 +128,10 @@ def apply_qc(adata: ad.AnnData, mode: str = "premerge", verbose: bool = False) -
     # # more than 50% mitochondrial counts
     if mode == "premerge":
         qc_cell = {
-                'u400genes': adata.obs.n_genes_by_counts < 400,
-                # 'o8000genes': adata.obs.n_genes_by_counts > 8000,
-                'u1000counts': adata.obs.total_counts < 1000,
-                'o50mtpct': adata.obs.pct_counts_mt > 50,
+            'u400genes': adata.obs.n_genes_by_counts < 400,
+            # 'o8000genes': adata.obs.n_genes_by_counts > 8000,
+            'u1000counts': adata.obs.total_counts < 1000,
+            'o50mtpct': adata.obs.pct_counts_mt > 50,
         }
         qc_gene = {}
 
@@ -122,7 +140,7 @@ def apply_qc(adata: ad.AnnData, mode: str = "premerge", verbose: bool = False) -
             'o8000genes': adata.obs.n_genes_by_counts > 8000,
         }
         qc_gene = {
-                'low_qual_u50cells': adata.var.n_cells_by_counts < 50,
+            'low_qual_u50cells': adata.var.n_cells_by_counts < 50,
         }
     else:
         raise ValueError("mode must be premerge or postmerge")
@@ -145,7 +163,7 @@ def apply_qc(adata: ad.AnnData, mode: str = "premerge", verbose: bool = False) -
     if len(qc_gene) > 0:
         mask_gene = np.any(np.vstack([adata.var[v] for v in qc_gene.keys()]), axis=0)
     else:
-        mask_gene = np.array([False for v in adata.var_names]) # np.zeros(adata.var_names.shape)
+        mask_gene = np.array([False for v in adata.var_names])
     
     if verbose:
         print('mask_cell', mask_cell.shape)
@@ -196,17 +214,17 @@ def trim_scp1644_data(input: ad.AnnData) -> ad.AnnData:
     # hemoglobin genes.
     adata_qc_join.var["hb"] = adata_qc_join.var_names.str.contains(("^HB[^(P)]"))
 
-    # see if we can replace with a copy up above
-    _, varinfo = sc.pp.calculate_qc_metrics(
+    sc.pp.calculate_qc_metrics(
         adata_qc_join, 
         qc_vars=["mt", "ribo", "hb"], 
-        inplace=False, 
+        inplace=True, 
         percent_top=[20], 
         log1p=False,
     ) 
 
-    # Remove genes present in fewer than 50 cells
-    adata_biopsy_prenorm = adata_qc_join[:, varinfo.n_cells_by_counts >= 50]
+    # Remove cells with more than 8000 genes and genes present in fewer than 50 cells
+    adata_biopsy_prenorm = apply_qc(adata_qc_join, mode="postmerge")
+    # adata_biopsy_prenorm = adata_qc_join[:, varinfo.n_cells_by_counts >= 50]
 
     # apply scrublet while we still have raw count data
     sc.pp.scrublet(adata_biopsy_prenorm)
