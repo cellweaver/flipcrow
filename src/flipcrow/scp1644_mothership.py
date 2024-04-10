@@ -578,8 +578,35 @@ def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.Data
     plt.show()
 
     for leiden_idx in sorted(adata.obs.leiden.unique().astype(int)):
-        print(leiden_idx, Counter(adata.obs.loc[scp1644_filter.obs.leiden == str(leiden_idx), 'Coarse_Cell_Annotations']))
+        print(leiden_idx, Counter(adata.obs.loc[adata.obs.leiden == str(leiden_idx), 'Coarse_Cell_Annotations']))
     
+    call_dict = verdict.T.index[np.argmax(verdict.T, axis=0)]
+
+    replace_dict = {
+        'T_Cells': 'T_NK',
+        'Macrophage': 'Macrophage',
+        'Tumor_keratins': 'Tumor',
+        'Basal': 'Tumor',
+        'CLASSICAL': 'Tumor',
+        'B_Cells': 'B_Cells',
+        'DC': 'DC',
+        'Mesenchymal': 'Mesenchymal',
+        'Liver_Cell': 'Hepatocyte',
+        'Plasma_cell': 'Plasma_cell',
+        'T_Regs': 'T_Regs',
+        'Endothelial': 'Endothelial',
+        'pDC_cell': 'pDC_cell',
+        'cp_DC': 'XCR1_DC',
+    }
+
+    verdict_strings = list(verdict.T.index[np.argmax(verdict.T, axis=0)])
+    verdict_buf = []
+    # note nested dictionaries here
+    for leid_idx in adata.obs.leiden:
+        verdict_buf.append(replace_dict[verdict_strings[int(leid_idx)]])
+
+    adata.obs.loc[:, 'local_coarse_call'] = verdict_buf
+
     return verdict
 
     
