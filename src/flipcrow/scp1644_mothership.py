@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import Union
+from typing import Union, Mapping
 import gzip
 import pathlib
 import time
@@ -32,7 +32,7 @@ sc.set_figure_params(figsize=(10, 10))
 print(sc._version.version)
 
 moffitt_pdac = {
-    'BASAL': [
+    'Basal': [
         'VGLL1', 
         'UCA1', 
         'S100A2', 
@@ -58,14 +58,14 @@ moffitt_pdac = {
         'SLC2A1',
         'ANXA8L2',
     ],
-    'CLASSICAL': [
+    'Classical': [
         'BTNL8',
         'FAM3D',
         'PRR15L', # 'ATAD4',
         'AGR3',
         'CTSE',
         # 'TMEM238L', # 'LOC400573', not present in genes
-        'LYZ',
+        # 'LYZ', # common in T cells
         'TFF2',
         'TFF1',
         'ANXA10',
@@ -87,6 +87,19 @@ moffitt_pdac = {
     ],
 }
 
+tumor_keratins = {
+    'Tumor_keratins': [
+        'KRT5',
+        'KRT7',
+        'KRT8', 
+        'KRT10',
+        'KRT13',
+        'KRT14',
+        'KRT17',
+        'KRT18',
+        'KRT19',
+    ]
+}
 
 
 def load_scp1644_data(check_metadata: bool = True) -> ad.AnnData:
@@ -237,7 +250,7 @@ def apply_qc(adata: ad.AnnData, mode: str = "premerge", verbose: bool = False) -
     return aw
 
 
-def pp_scp1644_data(adata: ad.AnnData) -> ad.AnnData:
+def preprocess_scp1644_data(adata: ad.AnnData) -> ad.AnnData:
     qc_buf = {}
 
     print("Per chunk QC")
@@ -407,7 +420,7 @@ def diffexpr_tests(adata: ad.AnnData): # -> Tuple[ad.AnnData, Mapping[str, Krusk
     return adata.copy(), kw_map, mwm_others_df, mwm_zeros_df
     
 
-def plot_cluster_gene_distr_1d(samples, others, cluster_key, gene_key, plot=True):
+def plot_cluster_gene_distr_1d(adata, samples, others, cluster_key, gene_key, plot=True):
 
     coi = int(cluster_key)
     samples_hist = np.histogram(samples[coi][:, gene_key].X.squeeze(), bins=20)
@@ -422,10 +435,10 @@ def plot_cluster_gene_distr_1d(samples, others, cluster_key, gene_key, plot=True
     join_cluster = this_cluster.join(adata.var.highly_variable, on='names')
     print(f"{gene_key} in {cluster_key}: {gene_key in join_cluster.names.values}")
     
-    if gene_key in chomp.names.values:
-        print(chomp.loc[chomp.names == gene_key, :])
+    if gene_key in join_cluster.names.values:
+        print(join_cluster.loc[join_cluster.names == gene_key, :])
 
-    return this_cluster
+    return this_cluster, join_cluster
 
 
 # TODO:  plot co-expression by chromosomal location
@@ -441,8 +454,8 @@ def check_rank_genes_groups_df(adata: ad.AnnData, coi: Union[int, str], focus_pr
 
 
 def classical_basal_analysis(adata: ad.AnnData) -> None:
-    sc.tl.score_genes(adata, moffitt_pdac['CLASSICAL'], score_name='classical_score', ctrl_size=100)
-    sc.tl.score_genes(adata, moffitt_pdac['BASAL'], score_name='basal_score', ctrl_size=100)
+    sc.tl.score_genes(adata, moffitt_pdac['Classical'], score_name='classical_score', ctrl_size=100)
+    sc.tl.score_genes(adata, moffitt_pdac['Basal'], score_name='basal_score', ctrl_size=100)
     adata.obs.loc[:, 'diff_score'] = adata.obs.classical_score - adata.obs.basal_score
     plt.plot(adata.obs.classical_score, adata.obs.basal_score, 'o')
 
@@ -473,6 +486,10 @@ def compare_classical_basal_genes(adata: ad.AnnData, classical_gene: str, basal_
     print('Spearman Basal', scipy.stats.spearmanr(adata.obs.basal_score, adata.to_df().loc[:, basal_gene].values))
 
 
+
+
+
+# TODO: Train this like a little NN
 def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.DataFrame:
 
     normal_markers = pd.read_excel(flipcrow.paths.DATA_PATH / "markergenes" / "mmc2.xlsx", header=4, dtype=object)
@@ -481,7 +498,6 @@ def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.Data
     normal_markers_dict = {}
 
     # filter datetime oddities found in original data probably caused by entering MARCH1, MARCH11 etc in dataset. This is (possibly?) auto converted to 11-Mar, 1-Mar, etc 
-
     for grpid, grp in normal_markers.groupby('cell.type'):
         normal_markers_dict[grpid] = [grp.loc[idx, 'Gene'] for idx in grp.index if type(grp.loc[idx, 'Gene']) == str and float(grp.loc[idx, 'power']) >= 0.6]
 
@@ -492,24 +508,16 @@ def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.Data
     markers_dict['Tumor_keratins'] = [
         'KRT5',
         'KRT6A',
-        'KRT6B',
-        'KRT6C',
         'KRT7',
         'KRT8', 
         'KRT10',
         'KRT13',
         'KRT14',
+        'KRT15',
         'KRT17',
         'KRT18',
         'KRT19',
     ]
-
-    # markers_dict['PDAC_quartet'] = [
-    #     'KRAS',
-    #     'TP53',
-    #     'SMAD4',
-    #     'CDKN2A',
-    # ]
 
     moffitt_pdac = {
         'Basal': [
@@ -567,8 +575,26 @@ def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.Data
         ],
     }
 
+    tumor_keratins = {
+        'Tumor_keratins': [
+            'KRT5',
+            'KRT7',
+            'KRT8', 
+            'KRT10',
+            'KRT13',
+            'KRT14',
+            'KRT17',
+            'KRT18',
+            'KRT19',
+        ]
+    }
+
+    # Make large leiden-based heatmap of the markers dict (Table 2)
     markers_dict.update(moffitt_pdac)
     sc.pl.heatmap(adata, markers_dict, 'leiden', figsize=(20, 20))
+
+    # show the marker_gene_overlap verdict of the markers_dict against leiden
+    # should probably rank_genes_groups first here
     verdict = sc.tl.marker_gene_overlap(adata, markers_dict, method='overlap_coef').T
     fig, ax = plt.subplots()
     im = ax.imshow(verdict.T)
@@ -577,17 +603,21 @@ def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.Data
     ax.grid(None)
     plt.show()
 
+    # count the number of cells in each leiden cluster
     for leiden_idx in sorted(adata.obs.leiden.unique().astype(int)):
         print(leiden_idx, Counter(adata.obs.loc[adata.obs.leiden == str(leiden_idx), 'Coarse_Cell_Annotations']))
     
+    # identifiy the call by argmax
+    # TODO: Modify this to trigger on significant amounts of tumor keratins or basal/classical
     call_dict = verdict.T.index[np.argmax(verdict.T, axis=0)]
 
+    # relabel markers from table to file
     replace_dict = {
         'T_Cells': 'T_NK',
         'Macrophage': 'Macrophage',
         'Tumor_keratins': 'Tumor',
         'Basal': 'Tumor',
-        'CLASSICAL': 'Tumor',
+        'Classical': 'Tumor',
         'B_Cells': 'B_Cells',
         'DC': 'DC',
         'Mesenchymal': 'Mesenchymal',
@@ -599,10 +629,21 @@ def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.Data
         'cp_DC': 'XCR1_DC',
     }
 
+    # assign verdicts based on tumor assignment to each leiden group
+    # TODO: should try this by donor_ID instaed
     verdict_strings = list(verdict.T.index[np.argmax(verdict.T, axis=0)])
     verdict_buf = []
     # note nested dictionaries here
     for leid_idx in adata.obs.leiden:
+        verdict_buf.append(replace_dict[verdict_strings[int(leid_idx)]])
+
+
+    adata.obs.loc[:, 'local_coarse_call'] = verdict_buf
+
+    verdict_strings = list(verdict.T.index[np.argmax(verdict.T, axis=0)])
+    verdict_buf = []
+    # note nested dictionaries here
+    for donor in adata.obs.donor_ID:
         verdict_buf.append(replace_dict[verdict_strings[int(leid_idx)]])
 
     adata.obs.loc[:, 'local_coarse_call'] = verdict_buf
@@ -610,7 +651,6 @@ def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.Data
     return verdict
 
     
-
 def tumor_study(adata: ad.AnnData, n_cells_cutoff=25) -> None:
     tumor_adata = adata[adata.obs['Coarse_Cell_Annotations'] == 'Tumor']
     
@@ -623,7 +663,8 @@ def tumor_study(adata: ad.AnnData, n_cells_cutoff=25) -> None:
     # Remove PANFR0580 NET + 3 low total cell counts
     donor_cell_count = Counter(adata.obs.donor_ID)
     low_cell_count = [k for k, v in donor_cell_count.items() if v < n_cells_cutoff]
-    remove_list = ['PANFR0580'] + [k for k, v in donor_cell_count.items() if v < 25]
+    remove_list = ['PANFR0580'] + low_cell_count
+
     print(f"Removed {remove_list} for < {n_cells_cutoff} cells")
     clean_adata = tumor_adata[[x not in remove_list for x in tumor_adata.obs.donor_ID], :]
     sc.pp.highly_variable_genes(clean_adata, flavor="seurat")
@@ -638,64 +679,105 @@ def tumor_study(adata: ad.AnnData, n_cells_cutoff=25) -> None:
     sc.pl.tsne(clean_adata, color=['leiden', 'donor_ID'], size=50, legend_loc="on data")
     plt.show()
 
-    print(len(clean_adata.obs.donor_ID.unique()))
+    print("Total donors", len(clean_adata.obs.donor_ID.unique()))
+    print("Cell count")
     print(Counter(clean_adata.obs.donor_ID))
 
     # Demonstrate that as per paper
-    # PC0 is EMT and characterized by FN1/VIM
+    # PC0 is EMT and characterized by FN1/VIM with -PC0 being Classical
     # PC1 is Classical 
-    # PC2 is Basal
-    pc_output = pd.DataFrame(clean_adata.varm['PCs'][:, 0:6], index=clean_adata.var_names).sort_values(0)
-    with pd.option_context('display.min_rows', 50):
-        print(pc_output)
+    # PC2 is Basal/Classical
     
-    # print first 10 genes for each PC
-    for pc in range(6):
-        # print(f"PC{pc}: {pc_output.sort_values(pc, ascending=False).index.to_list()[:20]}")
-        print(f"PC{pc} " + "="*40)
-        print('\n'.join(pc_output.sort_values(pc, ascending=False).index.to_list()[:50]))
-        print()
+    # rank PCs
+    pc_output = pd.DataFrame(clean_adata.varm['PCs'], index=clean_adata.var_names)
+    pc_buf = []
+    for pc in range(pc_output.shape[1]):
+        pc_buf.append(pc_output.sort_values(pc, ascending=False).index.to_list())
+    # pc_df is PCs by numeric ranks and not aligned with .varm so it goes into .uns
+    pc_df = pd.DataFrame(pc_buf, index=[f"PC{x}" for x in range(len(pc_buf))]).T
+
+    clean_adata.uns['PC_ranks'] = pc_df
+
+    print("Standard deviation explained by PCs")
+    plt.plot(np.power(clean_adata.uns['pca']['variance'][:20], 0.5), 'o')
+
+    print("PC score and heatmaps")
+    # PC 0: + Basal + Fibroblast like program of EMT tumor ; - Classical
+    # PC 1: + PANC0504/HPAC CCLE ; - BxPC-3 type signature CCLE
+    # PC 2: + Basal ; - Classical
+    # PC 3: + TSC22D1/APCDD1 tumor suppressor, EFNB2/IFIT1 EMT indicator, CLDN4 PDAC marker https://www.gastrojournal.org/article/S0016-5085(01)54349-8/fulltext ;
+    #       - Classical
+    import itertools
+    moffitt_labels = list(itertools.chain(*moffitt_pdac.values()))
+
+    # PC0 and PC2 are more differentiated by Moffitt classes than PC1
     
+    X_pca_df = pd.DataFrame(clean_adata.obsm['X_pca'], index=clean_adata.obs_names)
+
+    fig, ax = plt.subplots(figsize=(10, 12))
+    # important to scale this heatmap data!
+    # X axis is cells sorted by PC score
+    # Y axis is moffitt labels (basal on top, classical below)
+    pc_idx = 3
+    data = sc.pp.scale(clean_adata[X_pca_df.sort_values(pc_idx).index, moffitt_labels].X).T
+    print(data.min(), data.max())
+    im = ax.imshow(data, aspect='auto',  vmin=-1, vmax=3)
+    ax.set_yticks(range(len(moffitt_labels)), moffitt_labels)
+    ax.grid(None)
+
+    fig, ax = plt.subplots(figsize=(10, 15))
+    # the key is to scale this heatmap data!
+    # X axis is cells sorted by PC pc_idx (starting from 0) value
+    # Y axis is bottom n_bottom_top_genes and top n_bottom_top_genes genes by PC score
+    # so checking PC internal heatmapping
+    pc_idx = 2
+    n_bottom_top_genes = 30
+    bottom_top_genes = list(pc_output.sort_values(pc_idx).index[:n_bottom_top_genes]) + list(pc_output.sort_values(pc_idx).index[-n_bottom_top_genes:])
+    data = sc.pp.scale(clean_adata[X_pca_df.sort_values(pc_idx).index, bottom_top_genes].X).T
+    print(data.min(), data.max())
+    im = ax.imshow(data, aspect='auto', vmin=-2, vmax=3)
+    ax.set_yticks(range(len(bottom_top_genes)), bottom_top_genes)
+    ax.grid(None)
+
+    sc.pl.pca(clean_adata, color='donor_ID', size=60, annotate_var_explained=True, dimensions=[(0, 3), (1, 3), (2, 3)], legend_loc="on data")
+
     return clean_adata
+
+
+def score_pc_by_gene_heatmap(adata: ad.AnnData, gene_sets: Mapping, pcs: list) -> None:
+    print("PC score and heatmaps")
+    # PC 0: + Basal + Fibroblast like program of EMT tumor ; - Classical
+    # PC 1: + PANC0504/HPAC CCLE ; - BxPC-3 type signature CCLE
+    # PC 2: + Basal ; - Classical
+    # PC 3: + TSC22D1/APCDD1 tumor suppressor, EFNB2/IFIT1 EMT indicator, CLDN4 PDAC marker https://www.gastrojournal.org/article/S0016-5085(01)54349-8/fulltext ;
+    #       - Classical
+    import itertools
+    gene_labels = [x for x in list(itertools.chain(*gene_sets.values())) if x in adata.var_names]
+
+    # PC0 and PC2 are more differentiated by Moffitt classes than PC1
     
+    X_pca_df = pd.DataFrame(adata.obsm['X_pca'], index=adata.obs_names)
+
     
-    # sc.pl.tsne(clean_adata, color='pct_counts_mt')
-
-
-    # mttrim_adata = clean_adata[clean_adata.obs.pct_counts_mt <= 20, :]
-    # sc.pp.highly_variable_genes(mttrim_adata)
-    # sc.pp.pca(mttrim_adata)
-    # sc.pp.neighbors(mttrim_adata)
-    # sc.tl.tsne(mttrim_adata)
-    # sc.tl.leiden(mttrim_adata, resolution=2.)
-    # sc.pl.pca(mttrim_adata, color=['leiden', 'donor_ID'], size=100, legend_loc='on data')
-    # sc.pl.tsne(mttrim_adata, color=['leiden', 'donor_ID'], size=100, legend_loc='on data')
-
-    # print(Counter(mttrim_adata.obs.donor_ID))
-    # sc.tl.umap(mttrim_adata)
-
-    # with pd.option_context('display.min_rows', 50):
-    #     print(pd.DataFrame(mttrim_adata.varm['PCs'][:, 0:3], index=mttrim_adata.var_names).sort_values(2))    
-
-    # for x in range(3):
-    #     print('\n'.join(pd.DataFrame(mttrim_adata.varm['PCs'], index=mttrim_adata.var_names).sort_values(x, ascending=False).index[:50]))
-
-    # sc.tl.score_genes(mttrim_adata, moffitt_pdac['CLASSICAL'], score_name='classical_score', ctrl_size=100)
-    # sc.tl.score_genes(mttrim_adata, moffitt_pdac['BASAL'], score_name='basal_score', ctrl_size=100)
-    # mttrim_adata.obs.loc[:, 'diff_score'] = mttrim_adata.obs.classical_score - mttrim_adata.obs.basal_score
-
-    # sc.pl.heatmap(mttrim_adata, moffitt_pdac, 'diff_score', swap_axes=True, vmin=-1.5, vmax=3)
-
+    # important to scale this heatmap data!
+    # X axis is cells sorted by PC score
+    # Y axis is labels
+    for pc_idx in pcs:
+        print(pc_idx)
+        data = sc.pp.scale(adata[X_pca_df.sort_values(pc_idx).index, gene_labels].X).T
+        # print(data.min(), data.max())
+        _, ax = plt.subplots(figsize=(10, 15))    
+        im = ax.imshow(data, aspect='auto',  vmin=-1, vmax=5)
+        ax.set_yticks(range(len(gene_labels)), gene_labels)
+        ax.grid(None)
 
 
 if __name__ == "__main__":
-    adata_raw = load_adata_data(check_metadata=True)
-    adata_trim = trim_adata_data(adata_raw)
-    adata_log = norm_log_xform_adata_data(adata_trim)
+    adata_raw = load_scp1644_data(check_metadata=True)
+    adata_trim = preprocess_scp1644_data(adata_raw)
 
     print(adata_raw)
     print(adata_trim)
-    print(adata_log)
 
     cluster_key = '10'
     gene_key = 'A1CF'
