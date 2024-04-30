@@ -258,7 +258,7 @@ def preprocess_scp1644_data(adata: ad.AnnData) -> ad.AnnData:
         adata_chunk = adata[adata.obs['biosample_id']==id, :]
 
         # mitochondrial genes
-        adata_chunk.var['mt'] = adata_chunk.var_names.str.startswith(("MT-", "MTRNR"))
+        adata_chunk.var['mt'] = adata_chunk.var_names.str.startswith(("MT-"))
         # ribosomal genes
         adata_chunk.var["ribo"] = adata_chunk.var_names.str.startswith(("RPS", "RPL"))
         # hemoglobin genes.
@@ -285,7 +285,7 @@ def preprocess_scp1644_data(adata: ad.AnnData) -> ad.AnnData:
 
     print("Merged QC")
     # mitochondrial genes
-    qc_join.var['mt'] = qc_join.var_names.str.startswith(("MT-", "MTRNR"))
+    qc_join.var['mt'] = qc_join.var_names.str.startswith(("MT-"))
     # ribosomal genes
     qc_join.var["ribo"] = qc_join.var_names.str.startswith(("RPS", "RPL"))
     # hemoglobin genes.
@@ -303,24 +303,24 @@ def preprocess_scp1644_data(adata: ad.AnnData) -> ad.AnnData:
     clean = apply_qc(qc_join, mode="postmerge")
     del qc_join
 
-    print("Scrublet")
+    # print("Scrublet")
     # apply scrublet while we still have raw count data
-    sc.pp.scrublet(clean)
+    # sc.pp.scrublet(clean)
 
     clean.layers['trimmed_counts'] = clean.to_df().loc[clean.obs_names, :]
     sc.pp.normalize_total(clean, target_sum=10000, inplace=True)
     sc.pp.log1p(clean, copy=False)
     
-    print("Dimensionality reduction and clustering")
-    sc.pp.pca(clean)
-    sc.pp.neighbors(clean, n_neighbors=40, n_pcs=50)
-    sc.tl.leiden(clean)
-    sc.tl.umap(clean)
-    sc.tl.tsne(clean)
+    # print("Dimensionality reduction and clustering")
+    # sc.pp.pca(clean)
+    # sc.pp.neighbors(clean, n_neighbors=40, n_pcs=50)
+    # sc.tl.leiden(clean)
+    # sc.tl.umap(clean)
+    # sc.tl.tsne(clean)
 
-    print("HVG + Rank genes groups")
-    sc.pp.highly_variable_genes(clean, flavor="seurat")
-    sc.tl.rank_genes_groups(clean, 'leiden')
+    # print("HVG + Rank genes groups")
+    # sc.pp.highly_variable_genes(clean, flavor="seurat")
+    # sc.tl.rank_genes_groups(clean, 'leiden')
 
     return clean
 
@@ -490,7 +490,7 @@ def compare_classical_basal_genes(adata: ad.AnnData, classical_gene: str, basal_
 
 
 # TODO: Train this like a little NN
-def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.DataFrame:
+def coarse_cell_type_annotation(adata: ad.AnnData) -> pd.DataFrame:
 
     normal_markers = pd.read_excel(flipcrow.paths.DATA_PATH / "markergenes" / "mmc2.xlsx", header=4, dtype=object)
     normal_markers = normal_markers.iloc[:, 2:]
@@ -630,7 +630,7 @@ def coarse_cell_type_annotation(adata: ad.AnnData, n_cells_cutoff=25) -> pd.Data
     }
 
     # assign verdicts based on tumor assignment to each leiden group
-    # TODO: should try this by donor_ID instaed
+    # TODO: should try this by donor_ID instead
     verdict_strings = list(verdict.T.index[np.argmax(verdict.T, axis=0)])
     verdict_buf = []
     # note nested dictionaries here
