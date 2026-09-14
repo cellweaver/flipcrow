@@ -290,18 +290,14 @@ def apply_qc(adata: ad.AnnData, mode: str = "premerge", verbose: bool = False) -
     return aw
 
 
-def preprocess_scp1644_data(adata: ad.AnnData) -> ad.AnnData:
-    """Run per-biosample QC, merge, then normalise and log-transform.
+def preprocess_scp1644_data(adata: ad.AnnData, scrublet: bool = True) -> ad.AnnData:
+    """Run per-biosample QC and merge.
 
     Splits the input by `biosample_id` and computes QC metrics separately for each —
     flagging mitochondrial, ribosomal and haemoglobin gene sets — so one poor-quality
     biosample cannot drag the thresholds for the rest. Applies the premerge filter per
     chunk, concatenates, recomputes QC on the merged object, and applies the postmerge
     filter.
-
-    Raw counts are preserved in `layers['trimmed_counts']` before counts-per-10,000
-    normalisation and log1p. Doublet scoring, clustering and HVG selection are run from the
-    notebooks rather than here (see nbs/SCP1644_paper.ipynb).
     """
     qc_buf = {}
 
@@ -355,13 +351,16 @@ def preprocess_scp1644_data(adata: ad.AnnData) -> ad.AnnData:
     clean = apply_qc(qc_join, mode="postmerge")
     del qc_join
 
-    # log("Scrublet")
-    # apply scrublet while we still have raw count data
-    # sc.pp.scrublet(clean)
+    return clean
 
-    clean.layers['trimmed_counts'] = clean.to_df().loc[clean.obs_names, :]
-    sc.pp.normalize_total(clean, target_sum=10000, inplace=True)
-    sc.pp.log1p(clean, copy=False)
+    # if scrublet:
+    #     log("Scrublet")
+    #     # apply scrublet while we still have raw count data
+    #     sc.pp.scrublet(clean)
+
+    # clean.layers['trimmed_counts'] = clean.to_df().loc[clean.obs_names, :]
+    # sc.pp.normalize_total(clean, target_sum=10000, inplace=True)
+    # sc.pp.log1p(clean, copy=False)
     
     # log("Dimensionality reduction and clustering")
     # sc.pp.pca(clean)
@@ -374,7 +373,7 @@ def preprocess_scp1644_data(adata: ad.AnnData) -> ad.AnnData:
     # sc.pp.highly_variable_genes(clean, flavor="seurat")
     # sc.tl.rank_genes_groups(clean, 'leiden')
 
-    return clean
+#     return clean
 
 
 def mito_doublet_screen(adata: ad.AnnData, mt_cutoff: float = 0.15, doublet_cutoff: float = 0.1, use_pct_mt_stats=False) -> ad.AnnData:
