@@ -20,8 +20,8 @@ falls out of an independent implementation.
 1. Clone the repo.
 2. `pip install -e .` to install needed libraries.
 3. Download SCP1644 data into the `scp1644_data` folder in the repo using `curl` via the Single Cell Portal link above.
-4. Download Human MSigDB from https://www.gsea-msigdb.org/gsea/msigdb/download_file.jsp?filePath=/msigdb/release/2026.1.Hs/msigdb_v2026.1.Hs_files_to_download_locally.zip - you will need to register - and unzip it into the `scp1644_data` folder.
-5. Download the De Koning 2021 supplementary data https://public-pages-files-2025.frontiersin.org/articles/649061/file/Data_Sheet_1.xlsx/649061_supplementary-materials_datasheets_1_xlsx/1 into the `scp1644_data` folder and rename it `DeKoning2021.xlsx`
+4. Download [Human MSigDB gene sets](https://www.gsea-msigdb.org/gsea/msigdb/download_file.jsp?filePath=/msigdb/release/2026.1.Hs/msigdb_v2026.1.Hs_files_to_download_locally.zip) - you will need to register - and unzip it into the `scp1644_data` folder.
+5. Download the [De Koning 2021](https://www.frontiersin.org/journals/immunology/articles/10.3389/fimmu.2021.649061/full) [supplementary datasheet 1](https://public-pages-files-2025.frontiersin.org/articles/649061/file/Data_Sheet_1.xlsx/649061_supplementary-materials_datasheets_1_xlsx/1) into a `scp1644_data/markergenes` folder and rename it `DeKoning2021.xlsx`.
 
 ## What it does
 
