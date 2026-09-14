@@ -64,7 +64,7 @@ prerank against Enrichr libraries.
 ## Layout
 
 ```
-src/flipcrow/scp1644_mothership.py   loading, QC, preprocessing, annotation, DE, tumor analysis
+src/flipcrow/scp1644_lib.py   loading, QC, preprocessing, annotation, DE, tumor analysis
 src/flipcrow/paths.py                data path resolution
 nbs/SCP1644_preprocess_*.ipynb       preprocessing and coarse cell type annotation
 nbs/SCP1644_paper*.ipynb             analysis passes I–VII
@@ -103,7 +103,7 @@ be levelled, redirected or silenced. The package attaches only a `NullHandler`, 
 means **nothing is printed until you ask for it**. From a notebook:
 
 ```python
-from flipcrow.scp1644_mothership import configure_logging
+from flipcrow.scp1644_lib import configure_logging
 configure_logging()
 ```
 
