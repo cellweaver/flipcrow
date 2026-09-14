@@ -4,17 +4,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flipcrow"
-version = "0.0.1"
+version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = [
-  "torch",
-  "pandas",
-  "scipy",
-]
+description = "Single-cell RNA-seq reanalysis of metastatic pancreatic ductal adenocarcinoma (SCP1644), reimplementing the core analysis of Raghavan et al., Cell 2021, in Scanpy"
+readme = "README.md"
+license = {text = "MIT License"}
 authors = [
   {name = "Daniel Weaver", email = "greatergreen@protonmail.com"},
 ]
-description = "scRNAseq ML exploration"
-readme = "README.md"
-license = {text = "MIT License"}
+dependencies = [
+  "scanpy",
+  "anndata",
+  "scikit-image",   # required by scanpy.pp.scrublet
+  "gseapy",
+  "numpy",
+  "pandas",
+  "scipy",
+  "matplotlib",
+  "seaborn",
+  "openpyxl",       # required by pandas.read_excel for the marker gene table
+]
 
+[project.optional-dependencies]
+notebooks = ["jupyter", "decoupler", "pydeseq2"]
+
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
