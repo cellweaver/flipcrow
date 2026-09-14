@@ -15,6 +15,12 @@ The goal was to rebuild the published single-cell analysis end to end from raw d
 gene expression matrices, and to check whether the paper's tumor cell-state structure
 falls out of an independent implementation.
 
+## Installation instructions
+
+1. Clone the repo.
+2. `pip install -e .` to install needed libraries.
+3. Download SCP1644 data into the `scp1644_data` folder in the repo using `curl` via the Single Cell Portal link above.
+
 ## What it does
 
 **Loading and metadata reconciliation.** Reads the raw DGE matrices (1,370-cell and
