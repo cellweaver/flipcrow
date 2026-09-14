@@ -72,13 +72,41 @@ Portal under `data/SCP1644/`, and the paper's marker gene table at
 `data/markergenes/mmc2.xlsx`.
 
 ```
-pip install -e .
+pip install -e .                 # the library
+pip install -e ".[notebooks]"    # plus jupyter, decoupler, pydeseq2
 ```
 
-Requires Python 3.11+, scanpy, anndata, gseapy, pandas, scipy, numpy, seaborn, and
-matplotlib. Torch is used only for MPS device setup on Apple silicon.
+Requires Python 3.11+. Dependencies are declared in `pyproject.toml`.
+
+## Tests
+
+```
+pip install -e ".[dev]"
+pytest
+```
+
+Covers the QC filtering logic in `apply_qc`. The thresholds documented above are
+asserted against synthetic `AnnData` objects, so changing one without the other fails.
+
+## Logging
+
+Progress output goes through the standard library logger rather than `print`, so it can
+be levelled, redirected or silenced. The package attaches only a `NullHandler`, which
+means **nothing is printed until you ask for it**. From a notebook:
+
+```python
+from flipcrow.scp1644_mothership import configure_logging
+configure_logging()
+```
 
 ## Notes
 
 Analysis code and plotting are interleaved in the module; the notebooks are the working
 record of the analysis rather than a packaged pipeline.
+
+### AI assistance
+
+The analysis code in this repository was written without AI assistance. On 2026-09-14
+the packaging metadata, import cleanup, docstrings, and the test suite were revised with
+AI assistance; no analysis logic or threshold was changed. Affected sections are marked
+in the source.
